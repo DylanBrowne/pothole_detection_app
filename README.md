@@ -1,6 +1,7 @@
 # pothole_detection_app
 Mobile application built with Expo (React Native). Handles user interaction, sensor data, and offline storage, with support for syncing to a backend service.
 
+```
 pothole_detection_app/
 │
 ├── App.js
@@ -68,3 +69,4 @@ pothole_detection_app/
 │   └── (AI/tool metadata folder)
 │
 └── README.md
+```
