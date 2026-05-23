@@ -1,5 +1,6 @@
 import * as SQLite from 'expo-sqlite';
 import {OrientedBurst} from "@/utils/orientedBurst";
+import supabase from './supabase';
 
 let db: SQLite.SQLiteDatabase;
 
@@ -25,6 +26,30 @@ async function saveEvent(latitude: number, longitude: number, burst: OrientedBur
             JSON.stringify(burst.z_values),
             JSON.stringify(burst.timestamps_ms),
             detectAt]);
+}
+
+export async function syncEvents() {
+    const rows = await db.getAllAsync(
+        'SELECT * FROM pothole_events WHERE synced = 0'
+    );
+
+    for (const row of rows as any[]) {
+        try {
+            await supabase.from('pothole_events').insert({
+                latitude: row.latitude,
+                longitude: row.longitude,
+                z_values: row.z_values,
+                timestamps_ms: row.timestamps_ms,
+                detected_at: row.detected_at,
+            });
+            await db.runAsync(
+                'UPDATE pothole_events SET synced = 1 WHERE id = ?',
+                [row.id]
+            );
+        } catch (e) {
+            console.log('Sync failed:', e);
+        }
+    }
 }
 
 export { initDatabase, saveEvent };
