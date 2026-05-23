@@ -3,6 +3,7 @@ import { useState, useEffect } from 'react';
 import * as Location from 'expo-location';
 
 export default function HomeScreen() {
+
   const [potholeCount, setPotholeCount] = useState(0);
     useEffect(() => {
         // your startup code goes here
@@ -13,8 +14,10 @@ export default function HomeScreen() {
                 return;
             }
         };
+        start();
         console.log("App started");
     }, []);
+
   return (
       <View style ={{ flex: 1, backgroundColor: 'white'}}>
         <Text>Pothole Detector {potholeCount}</Text>
