@@ -6,7 +6,7 @@ let db: SQLite.SQLiteDatabase;
 
 const initDatabase  = async () => {
     db = await SQLite.openDatabaseAsync('potholes.db');
-    await db.execAsync(`CREATE TABLE IF NOT EXISTS pothole_events (
+    await db.execAsync(`CREATE TABLE IF NOT EXISTS events (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         latitude REAL,
         longitude REAL,
@@ -20,7 +20,7 @@ const initDatabase  = async () => {
 }
 
 async function saveEvent(latitude: number, longitude: number, burst: OrientedBurst, detectAt: string): Promise<void> {
-    await db.runAsync(`INSERT INTO pothole_events (latitude, longitude, z_values, timestamps_ms, detected_at)
+    await db.runAsync(`INSERT INTO events (latitude, longitude, z_values, timestamps_ms, detected_at)
         VALUES (?, ?, ?, ?, ?)`,
         [latitude, longitude,
             JSON.stringify(burst.z_values),
@@ -30,13 +30,13 @@ async function saveEvent(latitude: number, longitude: number, burst: OrientedBur
 
 export async function syncEvents() {
     const rows = await db.getAllAsync(
-        'SELECT * FROM pothole_events WHERE synced = 0'
+        'SELECT * FROM events WHERE synced = 0'
     );
     console.log('Unsynced events:', rows.length);
 
     for (const row of rows as any[]) {
         try {
-            await supabase.from('pothole_events').insert({
+            await supabase.from('events').insert({
                 latitude: row.latitude,
                 longitude: row.longitude,
                 z_values: row.z_values,
@@ -44,7 +44,7 @@ export async function syncEvents() {
                 detected_at: row.detected_at,
             });
             await db.runAsync(
-                'UPDATE pothole_events SET synced = 1 WHERE id = ?',
+                'UPDATE events SET synced = 1 WHERE id = ?',
                 [row.id]
             );
         } catch (e) {
