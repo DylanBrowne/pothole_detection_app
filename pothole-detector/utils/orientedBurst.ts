@@ -41,7 +41,7 @@ export interface OrientedBurst {
 export interface CollectOptions {
   /**
    * How long to record the burst in ms.
-   * Default 250 ms → ~50 samples at 200 Hz, the minimum the backend requires.
+   * Default 500 ms → ~50 samples at 100 Hz (actual mobile sensor delivery rate).
    */
   durationMs?: number;
   /** Target sensor polling rate in Hz. Default 200. */
@@ -195,7 +195,7 @@ const G = 9.80665; // m/s²
  * on devices that don't expose a gyroscope.
  */
 export async function collectOrientedBurst({
-  durationMs   = 250,
+  durationMs   = 500,
   sampleRateHz = 200,
   settleMs     = 100,
 }: CollectOptions = {}): Promise<OrientedBurst> {
