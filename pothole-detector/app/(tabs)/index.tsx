@@ -1,13 +1,33 @@
+import { fetchPotholes, PotholeRecord } from "@/utils/api";
 import { initDatabase, saveEvent, syncEvents } from "@/utils/database";
 import { collectOrientedBurst, OrientedBurst } from "@/utils/orientedBurst";
 import * as Location from 'expo-location';
 import { Accelerometer } from "expo-sensors";
 import { useEffect, useRef, useState } from 'react';
-import { Text, View } from 'react-native';
+import { Animated, Text, TouchableOpacity, View } from 'react-native';
+import MapView, { Marker } from 'react-native-maps';
 
 const THRESHOLD = 2.5;
 const CHART_HEIGHT = 72;
 const ACCEL_STALE_MS = 3000;
+const FETCH_RADIUS_MILES = 10;
+const REFETCH_THRESHOLD_MILES = 1.0;
+
+function distanceMiles(lat1: number, lng1: number, lat2: number, lng2: number): number {
+    const R = 3958.8;
+    const dLat = (lat2 - lat1) * Math.PI / 180;
+    const dLng = (lng2 - lng1) * Math.PI / 180;
+    const a = Math.sin(dLat / 2) ** 2 +
+        Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+        Math.sin(dLng / 2) ** 2;
+    return R * 2 * Math.asin(Math.sqrt(a));
+}
+
+function markerColor(severity: number): string {
+    if (severity > 0.7) return '#F44336';
+    if (severity > 0.4) return '#FF9800';
+    return '#FFC107';
+}
 
 function BurstChart({ burst }: { burst: OrientedBurst }) {
     const values = burst.z_values;
@@ -42,15 +62,38 @@ export default function HomeScreen() {
     const [gpsSpeed, setGpsSpeed] = useState(0);
     const [lastBurst, setLastBurst] = useState<OrientedBurst | null>(null);
     const [collecting, setCollecting] = useState(false);
+    const [mapVisible, setMapVisible] = useState(false);
+    const [nearbyPotholes, setNearbyPotholes] = useState<PotholeRecord[]>([]);
 
     const lastAccelRef = useRef(0);
+    const lastFetchRef = useRef<{ lat: number; lng: number } | null>(null);
+    const userLocationRef = useRef<{ latitude: number; longitude: number } | null>(null);
+    const mapRef = useRef<MapView>(null);
+    const toastAnim = useRef(new Animated.Value(0)).current;
 
-    // Marks accel as stale 3s after the last sample arrives
     useEffect(() => {
         setAccelLive(true);
         const t = setTimeout(() => setAccelLive(false), ACCEL_STALE_MS);
         return () => clearTimeout(t);
     }, [liveAccel]);
+
+    const triggerToast = () => {
+        toastAnim.stopAnimation();
+        Animated.sequence([
+            Animated.timing(toastAnim, { toValue: 1, duration: 300, useNativeDriver: true }),
+            Animated.delay(2500),
+            Animated.timing(toastAnim, { toValue: 0, duration: 300, useNativeDriver: true }),
+        ]).start();
+    };
+
+    const loadNearbyPotholes = async (lat: number, lng: number) => {
+        try {
+            const data = await fetchPotholes(lat, lng, FETCH_RADIUS_MILES);
+            setNearbyPotholes(data);
+        } catch (e) {
+            console.log('Pothole fetch failed:', e);
+        }
+    };
 
     useEffect(() => {
         const start = async () => {
@@ -87,6 +130,7 @@ export default function HomeScreen() {
                             );
                             setLastBurst(burst);
                             setPotholeCount(prev => prev + 1);
+                            triggerToast();
                         } catch (e) {
                             console.error('Burst failed:', e);
                         } finally {
@@ -103,13 +147,20 @@ export default function HomeScreen() {
                 { accuracy: Location.Accuracy.High, timeInterval: 1000 },
                 (location) => {
                     currentLocation = location;
+                    const { latitude: lat, longitude: lng } = location.coords;
+                    userLocationRef.current = { latitude: lat, longitude: lng };
                     const speed = location.coords.speed ?? 0;
                     setGpsSpeed(speed);
+
+                    const lastFetch = lastFetchRef.current;
+                    if (!lastFetch || distanceMiles(lastFetch.lat, lastFetch.lng, lat, lng) > REFETCH_THRESHOLD_MILES) {
+                        lastFetchRef.current = { lat, lng };
+                        loadNearbyPotholes(lat, lng);
+                    }
 
                     if (speed >= 0.000001) {
                         setIsDriving(true);
 
-                        // Watchdog: recreate subscription if no samples received recently
                         if (accelSubscription && Date.now() - lastAccelRef.current > ACCEL_STALE_MS) {
                             accelSubscription.remove();
                             accelSubscription = null;
@@ -139,9 +190,11 @@ export default function HomeScreen() {
     const magColor = magnitude >= THRESHOLD ? '#F44336' : magnitude > THRESHOLD * 0.6 ? '#FF9800' : '#4CAF50';
     const barWidth = `${Math.min(100, (magnitude / THRESHOLD) * 100)}%` as `${number}%`;
     const axisColor = (v: number) => Math.abs(v) > THRESHOLD * 0.4 ? '#FF9800' : '#555';
+    const speedMph = gpsSpeed * 2.237;
 
     return (
         <View style={{ flex: 1, backgroundColor: '#fff', padding: 24, paddingTop: 60 }}>
+
             <Text style={{ fontSize: 28, fontWeight: 'bold', textAlign: 'center' }}>
                 Pothole Detector
             </Text>
@@ -171,7 +224,6 @@ export default function HomeScreen() {
                     </Text>
                 </View>
 
-                {/* Individual axes */}
                 <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 10 }}>
                     {([['X', x], ['Y', y], ['Z', z]] as [string, number][]).map(([label, val]) => (
                         <View key={label} style={{ alignItems: 'center', flex: 1 }}>
@@ -183,7 +235,6 @@ export default function HomeScreen() {
                     ))}
                 </View>
 
-                {/* Magnitude */}
                 <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 6 }}>
                     <Text style={{ fontSize: 11, color: '#999' }}>magnitude</Text>
                     <Text style={{ fontSize: 36, fontWeight: '600', color: magColor, fontVariant: ['tabular-nums'] }}>
@@ -197,7 +248,6 @@ export default function HomeScreen() {
                     )}
                 </View>
 
-                {/* Bar gauge */}
                 <View style={{ height: 6, backgroundColor: '#e0e0e0', borderRadius: 3, marginTop: 10 }}>
                     <View style={{ height: 6, width: barWidth, backgroundColor: magColor, borderRadius: 3 }} />
                 </View>
@@ -220,6 +270,136 @@ export default function HomeScreen() {
                             peak: {Math.max(...lastBurst.z_values.map(Math.abs)).toFixed(2)} m/s²
                         </Text>
                     </View>
+                </View>
+            )}
+
+            {/* Map toggle button */}
+            <TouchableOpacity
+                onPress={() => setMapVisible(true)}
+                style={{
+                    position: 'absolute',
+                    bottom: 36,
+                    left: 48,
+                    right: 48,
+                    backgroundColor: '#111',
+                    borderRadius: 28,
+                    paddingVertical: 14,
+                    alignItems: 'center',
+                }}
+            >
+                <Text style={{ color: 'white', fontSize: 15, fontWeight: '600' }}>🗺  Map View</Text>
+            </TouchableOpacity>
+
+            {/* Full-screen map overlay */}
+            {mapVisible && (
+                <View style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }}>
+                    <MapView
+                        ref={mapRef}
+                        style={{ flex: 1 }}
+                        mapType="standard"
+                        showsUserLocation
+                        showsCompass={false}
+                        showsMyLocationButton={false}
+                        scrollEnabled={false}
+                        zoomEnabled={false}
+                        rotateEnabled={false}
+                        pitchEnabled={false}
+                        initialRegion={userLocationRef.current ? {
+                            ...userLocationRef.current,
+                            latitudeDelta: 0.01,
+                            longitudeDelta: 0.01,
+                        } : undefined}
+                        onUserLocationChange={(e) => {
+                            const coord = e.nativeEvent.coordinate;
+                            if (!coord) return;
+                            mapRef.current?.animateToRegion({
+                                latitude: coord.latitude,
+                                longitude: coord.longitude,
+                                latitudeDelta: 0.01,
+                                longitudeDelta: 0.01,
+                            }, 600);
+                        }}
+                    >
+                        {nearbyPotholes.map((p) => (
+                            <Marker
+                                key={p.pothole_id}
+                                coordinate={{ latitude: p.canonical_lat, longitude: p.canonical_lng }}
+                                pinColor={markerColor(p.severity_score)}
+                            />
+                        ))}
+                    </MapView>
+
+                    {/* Title banner */}
+                    <View style={{
+                        position: 'absolute',
+                        top: 0,
+                        left: 0,
+                        right: 0,
+                        paddingTop: 54,
+                        paddingBottom: 14,
+                        paddingHorizontal: 16,
+                        backgroundColor: 'rgba(255,255,255,0.92)',
+                        flexDirection: 'row',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                    }}>
+                        <View>
+                            <Text style={{ fontSize: 17, fontWeight: '700', color: '#111' }}>
+                                Potholes near you
+                            </Text>
+                            <Text style={{ fontSize: 12, color: '#888', marginTop: 1 }}>
+                                {nearbyPotholes.length} found within {FETCH_RADIUS_MILES} miles
+                            </Text>
+                        </View>
+
+                        {/* Sensor dot + speed */}
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                            <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: accelLive ? '#4CAF50' : '#ccc' }} />
+                            <Text style={{ fontSize: 14, fontWeight: '600', color: '#333', fontVariant: ['tabular-nums'] }}>
+                                {speedMph.toFixed(0)} mph
+                            </Text>
+                            <TouchableOpacity
+                                onPress={() => setMapVisible(false)}
+                                style={{ marginLeft: 8, backgroundColor: '#eee', borderRadius: 16, paddingHorizontal: 14, paddingVertical: 6 }}
+                            >
+                                <Text style={{ fontSize: 14, fontWeight: '600', color: '#333' }}>✕</Text>
+                            </TouchableOpacity>
+                        </View>
+                    </View>
+
+                    {/* Pothole detection toast */}
+                    <Animated.View
+                        pointerEvents="none"
+                        style={{
+                            position: 'absolute',
+                            top: 114,
+                            left: 40,
+                            right: 40,
+                            opacity: toastAnim,
+                            transform: [{
+                                translateY: toastAnim.interpolate({
+                                    inputRange: [0, 1],
+                                    outputRange: [-12, 0],
+                                }),
+                            }],
+                        }}
+                    >
+                        <View style={{
+                            backgroundColor: '#D32F2F',
+                            borderRadius: 14,
+                            paddingVertical: 12,
+                            paddingHorizontal: 20,
+                            alignItems: 'center',
+                            shadowColor: '#000',
+                            shadowOpacity: 0.4,
+                            shadowRadius: 10,
+                            elevation: 10,
+                        }}>
+                            <Text style={{ color: 'white', fontSize: 16, fontWeight: 'bold' }}>
+                                🚨 Pothole Detected!
+                            </Text>
+                        </View>
+                    </Animated.View>
                 </View>
             )}
         </View>
