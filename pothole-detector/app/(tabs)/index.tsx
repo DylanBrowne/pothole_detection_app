@@ -3,11 +3,13 @@ import { useState, useEffect } from 'react';
 import * as Location from 'expo-location';
 import {collectOrientedBurst} from "@/utils/orientedBurst";
 import {Accelerometer} from "expo-sensors";
+import {initDatabase, saveEvent} from "@/utils/database";
 
 export default function HomeScreen() {
 
   const [potholeCount, setPotholeCount] = useState(0);
   const [isDriving, setIsDriving] = useState(false);
+  let currentLocation: Location.LocationObject | null = null;
     useEffect(() => {
         // your startup code goes here
         const start = async () => {
@@ -16,18 +18,33 @@ export default function HomeScreen() {
                 console.log('Permission denied');
                 return;
             }
+
+            await initDatabase();
+            let accelSubscription: any = null;
+
             await Location.watchPositionAsync(
                 { accuracy: Location.Accuracy.High, timeInterval: 1000 },
                 (location) => {
-                    const speed = location.coords.speed ?? 0; // m/s
+                    let currentLocation = location;
+                    const speed = currentLocation.coords.speed ?? 0; // m/s
                     if (speed >= 6.7056) {
                         console.log('Driving');
                         setIsDriving(true);
-                        Accelerometer.addListener(async ({x, y, z}) => {
-                            if (Math.abs(z) > 1.5) {
-                                const burst = await collectOrientedBurst();
-                            }
-                        });
+                        if (accelSubscription == null) {
+                            accelSubscription = Accelerometer.addListener(async ({x, y, z}) => {
+                                if (Math.abs(z) > 1.5) {
+                                    const burst = await collectOrientedBurst();
+                                    await saveEvent(currentLocation.coords.latitude,
+                                        currentLocation.coords.longitude,
+                                        burst,
+                                        currentLocation.timestamp.toString());
+                                }
+                            });
+                        } else {
+                            accelSubscription.remove();
+                            accelSubscription = null;
+
+                        }
                     } else {
                         console.log('Not driving');
                         setIsDriving(false);
