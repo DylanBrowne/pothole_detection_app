@@ -28,26 +28,26 @@ export default function HomeScreen() {
                     let currentLocation = location;
                     const speed = currentLocation.coords.speed ?? 0; // m/s
                     if (speed >= 6.7056) {
-                        console.log('Driving');
                         setIsDriving(true);
                         if (accelSubscription == null) {
-                            accelSubscription = Accelerometer.addListener(async ({x, y, z}) => {
+                            accelSubscription = Accelerometer.addListener(async ({ x, y, z }) => {
                                 if (Math.abs(z) > 1.5) {
                                     const burst = await collectOrientedBurst();
                                     await saveEvent(currentLocation.coords.latitude,
                                         currentLocation.coords.longitude,
                                         burst,
                                         currentLocation.timestamp.toString());
+                                    setPotholeCount(prev => prev + 1);
                                 }
                             });
-                        } else {
-                            accelSubscription.remove();
-                            accelSubscription = null;
-
                         }
                     } else {
-                        console.log('Not driving');
+                        // not driving
                         setIsDriving(false);
+                        if (accelSubscription) {
+                            accelSubscription.remove();
+                            accelSubscription = null;
+                        }
                     }
                 }
             );
