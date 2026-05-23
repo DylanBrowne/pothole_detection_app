@@ -65,6 +65,11 @@ export async function syncEvents() {
     const app_version = Constants.expoConfig?.version ?? '1.0.0';
 
     for (const row of rows as any[]) {
+        const zValues: number[] = JSON.parse(row.z_values);
+        if (zValues.length < 50) {
+            await db.runAsync('UPDATE events SET synced = 1 WHERE id = ?', [row.id]);
+            continue;
+        }
         try {
             await postEvent({
                 device_id,

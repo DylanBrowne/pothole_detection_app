@@ -195,7 +195,7 @@ const G = 9.80665; // m/s²
  * on devices that don't expose a gyroscope.
  */
 export async function collectOrientedBurst({
-  durationMs   = 250,
+  durationMs   = 500,
   sampleRateHz = 200,
   settleMs     = 100,
 }: CollectOptions = {}): Promise<OrientedBurst> {
