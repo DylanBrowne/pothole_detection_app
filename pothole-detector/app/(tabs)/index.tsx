@@ -4,6 +4,7 @@ import * as Location from 'expo-location';
 import {collectOrientedBurst} from "@/utils/orientedBurst";
 import {Accelerometer} from "expo-sensors";
 import {initDatabase, saveEvent} from "@/utils/database";
+import {syncEvents} from "@/utils/database";
 
 export default function HomeScreen() {
 
@@ -19,6 +20,11 @@ export default function HomeScreen() {
             }
 
             await initDatabase();
+
+            setInterval(async () => {
+                await syncEvents();
+            }, 30000);
+
             let accelSubscription: any = null;
 
             await Location.watchPositionAsync(
