@@ -6,8 +6,10 @@ interface EventPayload {
     longitude: number;
     detected_at: string;
     app_version: string;
-    z_values: number[];
-    timestamps_ms: number[];
+    accel_burst: {
+        z_values: number[];
+        timestamps_ms: number[];
+    };
 }
 
 export async function postEvent(payload: EventPayload): Promise<void> {

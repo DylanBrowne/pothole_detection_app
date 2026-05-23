@@ -72,8 +72,10 @@ export async function syncEvents() {
                 longitude: row.longitude,
                 detected_at: row.detected_at,
                 app_version,
-                z_values: JSON.parse(row.z_values),
-                timestamps_ms: JSON.parse(row.timestamps_ms),
+                accel_burst: {
+                    z_values: JSON.parse(row.z_values),
+                    timestamps_ms: JSON.parse(row.timestamps_ms),
+                },
             });
             await db.runAsync('UPDATE events SET synced = 1 WHERE id = ?', [row.id]);
         } catch (e) {
