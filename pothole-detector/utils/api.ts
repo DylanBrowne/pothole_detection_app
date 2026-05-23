@@ -17,6 +17,7 @@ export async function postEvent(payload: EventPayload): Promise<void> {
         body: JSON.stringify(payload),
     });
     if (!response.ok) {
-        throw new Error(`HTTP ${response.status}`);
+        const body = await response.text().catch(() => '');
+        throw new Error(`HTTP ${response.status}: ${body}`);
     }
 }

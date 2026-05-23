@@ -43,7 +43,7 @@ export default function HomeScreen() {
                                     await saveEvent(currentLocation.coords.latitude,
                                         currentLocation.coords.longitude,
                                         burst,
-                                        currentLocation.timestamp.toString());
+                                        new Date(currentLocation.timestamp).toISOString());
                                     setPotholeCount(prev => prev + 1);
                                     isCollecting = false;
                                 }
