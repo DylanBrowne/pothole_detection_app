@@ -9,7 +9,6 @@ export default function HomeScreen() {
 
   const [potholeCount, setPotholeCount] = useState(0);
   const [isDriving, setIsDriving] = useState(false);
-  let currentLocation: Location.LocationObject | null = null;
     useEffect(() => {
         // your startup code goes here
         const start = async () => {
