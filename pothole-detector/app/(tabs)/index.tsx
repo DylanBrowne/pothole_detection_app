@@ -32,17 +32,20 @@ export default function HomeScreen() {
                 (location) => {
                     let currentLocation = location;
                     const speed = currentLocation.coords.speed ?? 0; // m/s
-                    if (speed >= 6.7056) {
+                    if (speed >= 0.000001) {
                         setIsDriving(true);
                         if (accelSubscription == null) {
+                            let isCollecting = false;
                             accelSubscription = Accelerometer.addListener(async ({ x, y, z }) => {
-                                if (Math.abs(z) > 1.5) {
+                                if (Math.abs(z) > 0.5 && !isCollecting) {
+                                    isCollecting = true;
                                     const burst = await collectOrientedBurst();
                                     await saveEvent(currentLocation.coords.latitude,
                                         currentLocation.coords.longitude,
                                         burst,
                                         currentLocation.timestamp.toString());
                                     setPotholeCount(prev => prev + 1);
+                                    isCollecting = false;
                                 }
                             });
                         }
