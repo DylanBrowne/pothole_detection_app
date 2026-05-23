@@ -61,10 +61,14 @@ export default function HomeScreen() {
         console.log("App started");
     }, []);
 
-  return (
-      <View style ={{ flex: 1, backgroundColor: 'white'}}>
-        <Text>Pothole Detector: {potholeCount}</Text>
-          <Text>Driving: {isDriving ? 'Yes' : 'No'}</Text>
-      </View>
-  );
+    return (
+        <View style={{ flex: 1, backgroundColor: 'white', padding: 40, alignItems: 'center', justifyContent: 'center' }}>
+            <Text style={{ fontSize: 32, fontWeight: 'bold' }}>🚗 Pothole Detector</Text>
+            <Text style={{ fontSize: 24, marginTop: 20, color: isDriving ? 'green' : 'gray' }}>
+                {isDriving ? '🟢 Driving' : '⚫ Not Driving'}
+            </Text>
+            <Text style={{ fontSize: 48, fontWeight: 'bold', marginTop: 30 }}>{potholeCount}</Text>
+            <Text style={{ fontSize: 16, color: 'gray' }}>Potholes Detected</Text>
+        </View>
+    );
 }
