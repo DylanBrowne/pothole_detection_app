@@ -37,7 +37,7 @@ export default function HomeScreen() {
                         if (accelSubscription == null) {
                             let isCollecting = false;
                             accelSubscription = Accelerometer.addListener(async ({ x, y, z }) => {
-                                if (Math.abs(z) > 0.5 && !isCollecting) {
+                                if (Math.abs(z) > 1 && !isCollecting) {
                                     isCollecting = true;
                                     const burst = await collectOrientedBurst();
                                     await saveEvent(currentLocation.coords.latitude,

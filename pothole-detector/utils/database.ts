@@ -32,6 +32,7 @@ export async function syncEvents() {
     const rows = await db.getAllAsync(
         'SELECT * FROM pothole_events WHERE synced = 0'
     );
+    console.log('Unsynced events:', rows.length);
 
     for (const row of rows as any[]) {
         try {
