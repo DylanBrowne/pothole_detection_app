@@ -1,6 +1,8 @@
 import { Text, View } from 'react-native';
 import { useState, useEffect } from 'react';
 import * as Location from 'expo-location';
+import {collectOrientedBurst} from "@/utils/orientedBurst";
+import {Accelerometer} from "expo-sensors";
 
 export default function HomeScreen() {
 
@@ -21,6 +23,11 @@ export default function HomeScreen() {
                     if (speed >= 6.7056) {
                         console.log('Driving');
                         setIsDriving(true);
+                        Accelerometer.addListener(async ({x, y, z}) => {
+                            if (Math.abs(z) > 1.5) {
+                                const burst = await collectOrientedBurst();
+                            }
+                        });
                     } else {
                         console.log('Not driving');
                         setIsDriving(false);
