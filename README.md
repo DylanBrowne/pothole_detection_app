@@ -3,7 +3,7 @@
 Mobile application built with Expo (React Native) that collects sensor data, detects potholes, and stores events locally with support for backend syncing.
 
 ## Team — Here for Free Food (HF³)
-- Dylan Browne (primary developer)
+- Dylan Browne
 - Willow Bloom
 - Jordan Eng
 
