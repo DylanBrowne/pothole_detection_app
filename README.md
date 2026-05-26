@@ -1,72 +1,45 @@
-# pothole_detection_app
-Mobile application built with Expo (React Native). Handles user interaction, sensor data, and offline storage, with support for syncing to a backend service.
+# Pothole Detection App
 
+Mobile application built with Expo (React Native) that collects sensor data, detects potholes, and stores events locally with support for backend syncing.
+
+## Team — Here for Free Food (HF³)
+- Dylan Browne (primary developer)
+- Willow Bloom
+- Jordan Eng
+
+## Features
+- Real-time accelerometer data (X, Y, Z)
+- Pothole count display
+- Offline storage (SQLite)
+- Runs with Expo Go
+
+## Tech Stack
+- Expo (React Native)
+- SQLite
+- FastAPI (backend, separate repo)
+- Supabase / PostGIS
+- Next.js (dashboard)
+
+## Run
+```bash
+npx expo start
 ```
-pothole_detection_app/
-│
-├── App.js
-├── app.json
-├── package.json
-├── package-lock.json
-│
-├── assets/
-│   ├── images/
-│   ├── icons/
-│   └── fonts/
-│
-├── src/
-│   ├── components/
-│   │   ├── Button.js
-│   │   ├── StatusCard.js
-│   │   └── PotholeMarker.js
-│   │
-│   ├── screens/
-│   │   ├── HomeScreen.js
-│   │   ├── DetectionScreen.js
-│   │   └── LogsScreen.js
-│   │
-│   ├── sensors/
-│   │   ├── accelerometer.js
-│   │   ├── gyroscope.js
-│   │   └── detector.js
-│   │
-│   ├── database/
-│   │   ├── sqlite.js
-│   │   └── eventQueue.js
-│   │
-│   ├── services/
-│   │   ├── locationService.js
-│   │   └── syncService.js
-│   │
-│   ├── hooks/
-│   │   └── usePotholeDetection.js
-│   │
-│   ├── utils/
-│   │   ├── math.js
-│   │   ├── thresholds.js
-│   │   └── constants.js
-│   │
-│   └── navigation/
-│       └── AppNavigator.js
-│
-├── scripts/
-│   └── (build / helper scripts if needed)
-│
-├── node_modules/
-│
-├── .expo/
-│   ├── settings.json
-│   ├── packager-info.json
-│   └── (cache files)
-│
-├── .idea/
-│   └── (IntelliJ config files)
-│
-├── .vscode/
-│   └── settings.json
-│
-├── .Claude/
-│   └── (AI/tool metadata folder)
-│
-└── README.md
+
+or
+```bash
+npx expo start --tunnel
 ```
+
+Scan the QR code with Expo Go.
+
+## Structure
+```text
+src/
+  screens/
+  sensors/
+  database/
+  services/
+```
+
+## Notes
+- Backend and dashboard are separate repositories
