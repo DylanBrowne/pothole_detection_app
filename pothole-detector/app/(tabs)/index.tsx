@@ -68,6 +68,7 @@ export default function HomeScreen() {
     const lastAccelRef = useRef(0);
     const lastFetchRef = useRef<{ lat: number; lng: number } | null>(null);
     const userLocationRef = useRef<{ latitude: number; longitude: number } | null>(null);
+    const prevMapCoordRef = useRef<{ latitude: number; longitude: number } | null>(null);
     const mapRef = useRef<MapView>(null);
     const toastAnim = useRef(new Animated.Value(0)).current;
 
@@ -300,6 +301,7 @@ export default function HomeScreen() {
                         showsUserLocation
                         showsCompass={false}
                         showsMyLocationButton={false}
+                        showsPointsOfInterest={false}
                         scrollEnabled={false}
                         zoomEnabled={false}
                         rotateEnabled={false}
@@ -312,18 +314,25 @@ export default function HomeScreen() {
                         onUserLocationChange={(e) => {
                             const coord = e.nativeEvent.coordinate;
                             if (!coord) return;
-                            mapRef.current?.animateToRegion({
-                                latitude: coord.latitude,
-                                longitude: coord.longitude,
-                                latitudeDelta: 0.01,
-                                longitudeDelta: 0.01,
-                            }, 600);
+                            const prev = prevMapCoordRef.current;
+                            let heading = 0;
+                            if (prev) {
+                                const dLat = (coord.latitude - prev.latitude) * Math.PI / 180;
+                                const dLng = (coord.longitude - prev.longitude) * Math.PI / 180;
+                                const lat1 = prev.latitude * Math.PI / 180;
+                                const lat2 = coord.latitude * Math.PI / 180;
+                                const x = Math.sin(dLng) * Math.cos(lat2);
+                                const y = Math.cos(lat1) * Math.sin(lat2) - Math.sin(lat1) * Math.cos(lat2) * Math.cos(dLng);
+                                heading = (Math.atan2(x, y) * 180 / Math.PI + 360) % 360;
+                            }
+                            prevMapCoordRef.current = { latitude: coord.latitude, longitude: coord.longitude };
                             mapRef.current?.animateCamera({
+                                center: { latitude: coord.latitude, longitude: coord.longitude },
                                 pitch: 75,
-                                heading: 0,
+                                heading,
                                 altitude: 250,
-                                zoom: 15,
-                            });
+                                zoom: 18,
+                            }, { duration: 600 });
                         }}
                     >
                         {nearbyPotholes.map((p) => (
