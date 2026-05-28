@@ -324,6 +324,12 @@ export default function HomeScreen() {
                                 latitudeDelta: 0.01,
                                 longitudeDelta: 0.01,
                             }, 600);
+                            mapRef.current?.animateCamera({
+                                pitch: 75,
+                                heading: 0,
+                                altitude: 250,
+                                zoom: 15,
+                            });
                         }}
                     >
                         {nearbyPotholes.map((p) => (
