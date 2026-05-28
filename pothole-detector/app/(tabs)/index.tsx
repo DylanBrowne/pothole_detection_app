@@ -66,6 +66,7 @@ export default function HomeScreen() {
     const [nearbyPotholes, setNearbyPotholes] = useState<PotholeRecord[]>([]);
 
     const lastAccelRef = useRef(0);
+    const lastRenderRef = useRef(0);
     const lastFetchRef = useRef<{ lat: number; lng: number } | null>(null);
     const userLocationRef = useRef<{ latitude: number; longitude: number } | null>(null);
     const prevMapCoordRef = useRef<{ latitude: number; longitude: number } | null>(null);
@@ -115,8 +116,13 @@ export default function HomeScreen() {
             const subscribeAccel = () => {
                 let isCollecting = false;
                 return Accelerometer.addListener(async ({ x, y, z }) => {
-                    lastAccelRef.current = Date.now();
-                    setLiveAccel({ x, y, z });
+                    const now = Date.now();
+                    lastAccelRef.current = now;
+                    // Throttle React state updates to 20Hz to avoid overwhelming the renderer
+                    if (now - lastRenderRef.current >= 50) {
+                        lastRenderRef.current = now;
+                        setLiveAccel({ x, y, z });
+                    }
                     const magnitude = Math.sqrt(x * x + y * y + z * z);
                     if (magnitude > THRESHOLD && !isCollecting) {
                         isCollecting = true;
