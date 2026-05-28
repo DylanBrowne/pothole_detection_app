@@ -64,6 +64,8 @@ export default function HomeScreen() {
     const [collecting, setCollecting] = useState(false);
     const [mapVisible, setMapVisible] = useState(false);
     const [nearbyPotholes, setNearbyPotholes] = useState<PotholeRecord[]>([]);
+    const [debugMode, setDebugMode] = useState(false);
+    const debugModeRef = useRef(false);
 
     const lastAccelRef = useRef(0);
     const lastRenderRef = useRef(0);
@@ -78,6 +80,11 @@ export default function HomeScreen() {
         const t = setTimeout(() => setAccelLive(false), ACCEL_STALE_MS);
         return () => clearTimeout(t);
     }, [liveAccel]);
+
+    const toggleDebugMode = () => {
+        debugModeRef.current = !debugModeRef.current;
+        setDebugMode(debugModeRef.current);
+    };
 
     const triggerToast = () => {
         toastAnim.stopAnimation();
@@ -108,7 +115,7 @@ export default function HomeScreen() {
             await initDatabase();
 
             setInterval(async () => {
-                await syncEvents();
+                if (!debugModeRef.current) await syncEvents();
             }, 30000);
 
             let accelSubscription: any = null;
@@ -129,12 +136,14 @@ export default function HomeScreen() {
                         setCollecting(true);
                         try {
                             const burst = await collectOrientedBurst();
-                            await saveEvent(
-                                currentLocation.coords.latitude,
-                                currentLocation.coords.longitude,
-                                burst,
-                                new Date(currentLocation.timestamp).toISOString()
-                            );
+                            if (!debugModeRef.current) {
+                                await saveEvent(
+                                    currentLocation.coords.latitude,
+                                    currentLocation.coords.longitude,
+                                    burst,
+                                    new Date(currentLocation.timestamp).toISOString()
+                                );
+                            }
                             setLastBurst(burst);
                             setPotholeCount(prev => prev + 1);
                             triggerToast();
@@ -160,13 +169,13 @@ export default function HomeScreen() {
                     setGpsSpeed(speed);
 
                     const lastFetch = lastFetchRef.current;
-                    if (!lastFetch || distanceMiles(lastFetch.lat, lastFetch.lng, lat, lng) > REFETCH_THRESHOLD_MILES) {
+                    if (!debugModeRef.current && (!lastFetch || distanceMiles(lastFetch.lat, lastFetch.lng, lat, lng) > REFETCH_THRESHOLD_MILES)) {
                         lastFetchRef.current = { lat, lng };
                         loadNearbyPotholes(lat, lng);
                     }
 
-                    if (speed >= 0.000001) {
-                        setIsDriving(true);
+                    if (speed >= 0.000001 || debugModeRef.current) {
+                        setIsDriving(speed >= 0.000001);
 
                         if (accelSubscription && Date.now() - lastAccelRef.current > ACCEL_STALE_MS) {
                             accelSubscription.remove();
@@ -214,6 +223,19 @@ export default function HomeScreen() {
                 <Text style={{ fontSize: 14, color: '#999' }}>
                     {(gpsSpeed * 3.6).toFixed(1)} km/h
                 </Text>
+                <TouchableOpacity
+                    onPress={toggleDebugMode}
+                    style={{
+                        paddingHorizontal: 10,
+                        paddingVertical: 4,
+                        borderRadius: 8,
+                        backgroundColor: debugMode ? '#FF9800' : '#e0e0e0',
+                    }}
+                >
+                    <Text style={{ fontSize: 12, fontWeight: '600', color: debugMode ? '#fff' : '#888' }}>
+                        {debugMode ? 'DEBUG ON' : 'DEBUG'}
+                    </Text>
+                </TouchableOpacity>
             </View>
 
             {/* Pothole count */}
