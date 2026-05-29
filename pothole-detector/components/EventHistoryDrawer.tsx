@@ -1,8 +1,9 @@
 import { LocalEvent } from '@/utils/database';
-import { useEffect, useRef } from 'react';
-import { Animated, Dimensions, Image, ScrollView, Text, TouchableOpacity, View } from 'react-native';
+import { useEffect, useRef, useState } from 'react';
+import { Alert, Animated, Dimensions, Image, ScrollView, Text, TouchableOpacity, View } from 'react-native';
 
 const DRAWER_WIDTH = Math.round(Dimensions.get('window').width * 0.88);
+const MARGIN_RIGHT = 0.5
 
 function formatRelativeTime(isoString: string): string {
     const diff = Date.now() - new Date(isoString).getTime();
@@ -26,9 +27,10 @@ interface Props {
     visible: boolean;
     events: LocalEvent[];
     onClose: () => void;
+    onClear: () => void;
 }
 
-export function EventHistoryDrawer({ visible, events, onClose }: Props) {
+export function EventHistoryDrawer({ visible, events, onClose, onClear }: Props) {
     const translateX = useRef(new Animated.Value(DRAWER_WIDTH)).current;
     const scrimOpacity = useRef(new Animated.Value(0)).current;
 
@@ -94,12 +96,27 @@ export function EventHistoryDrawer({ visible, events, onClose }: Props) {
                             {events.length} event{events.length !== 1 ? 's' : ''} · last 30 days
                         </Text>
                     </View>
-                    <TouchableOpacity
-                        onPress={onClose}
-                        style={{ backgroundColor: '#eee', borderRadius: 16, paddingHorizontal: 14, paddingVertical: 6 }}
-                    >
-                        <Text style={{ fontSize: 14, fontWeight: '600', color: '#333' }}>✕</Text>
-                    </TouchableOpacity>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                        <TouchableOpacity
+                            onPress={() => Alert.alert(
+                                'Clear History',
+                                'This will permanently delete all detection history. Continue?',
+                                [
+                                    { text: 'Cancel', style: 'cancel' },
+                                    { text: 'Clear', style: 'destructive', onPress: onClear },
+                                ]
+                            )}
+                            style={{ backgroundColor: '#eee', borderRadius: 16, paddingHorizontal: 14, paddingVertical: 6 }}
+                        >
+                            <Text style={{ fontSize: 14, fontWeight: '600', color: '#888' }}>CLEAR</Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity
+                            onPress={onClose}
+                            style={{ backgroundColor: '#eee', borderRadius: 16, paddingHorizontal: 14, paddingVertical: 6 }}
+                        >
+                            <Text style={{ fontSize: 14, fontWeight: '600', color: '#E57373' }}>✕</Text>
+                        </TouchableOpacity>
+                    </View>
                 </View>
 
                 <ScrollView
@@ -124,6 +141,8 @@ function EventCard({ event }: { event: LocalEvent }) {
     const values = event.z_values;
     const maxAbs = Math.max(...values.map(Math.abs), 0.1);
 
+    const [width, setWidth] = useState(3);
+
     return (
         <View style={{ backgroundColor: '#f7f7f7', borderRadius: 12, overflow: 'hidden' }}>
             {event.snapshot_b64 ? (
@@ -145,14 +164,15 @@ function EventCard({ event }: { event: LocalEvent }) {
                 <Text style={{ fontSize: 11, color: '#aaa', marginBottom: 8, fontVariant: ['tabular-nums'] }}>
                     {event.latitude.toFixed(5)}, {event.longitude.toFixed(5)}
                 </Text>
-                <View style={{ flexDirection: 'row', alignItems: 'center', height: 28 }}>
+                <View onLayout={(e) => setWidth(e.nativeEvent.layout.width)} style={{ flexDirection: 'row', alignItems: 'center', height: 28 }}>
                     {values.map((v, i) => {
                         const h = Math.max(1, (Math.abs(v) / maxAbs) * 14);
+                        const totalMargin = MARGIN_RIGHT * values.length;
                         return (
                             <View
                                 key={i}
                                 style={{
-                                    width: 2,
+                                    width: (width - totalMargin) / values.length,
                                     height: h,
                                     marginRight: 0.5,
                                     backgroundColor: v < 0 ? '#2196F3' : '#F44336',

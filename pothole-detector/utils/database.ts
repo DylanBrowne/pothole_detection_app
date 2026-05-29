@@ -144,4 +144,8 @@ export async function getLocalEvents(): Promise<LocalEvent[]> {
     }));
 }
 
+export async function clearLocalEvents(): Promise<void> {
+    await db.runAsync('DELETE FROM local_events');
+}
+
 export { initDatabase, saveEvent };
