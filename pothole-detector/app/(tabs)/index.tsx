@@ -1,6 +1,7 @@
 import { fetchPotholes, PotholeRecord } from "@/utils/api";
-import { initDatabase, saveEvent, syncEvents } from "@/utils/database";
+import { getLocalEvents, initDatabase, LocalEvent, saveEvent, saveLocalEvent, syncEvents } from "@/utils/database";
 import { collectOrientedBurst, OrientedBurst } from "@/utils/orientedBurst";
+import { EventHistoryDrawer } from "@/components/EventHistoryDrawer";
 import * as Location from 'expo-location';
 import { Accelerometer } from "expo-sensors";
 import { useEffect, useRef, useState } from 'react';
@@ -66,6 +67,8 @@ export default function HomeScreen() {
     const [nearbyPotholes, setNearbyPotholes] = useState<PotholeRecord[]>([]);
     const [debugMode, setDebugMode] = useState(false);
     const debugModeRef = useRef(false);
+    const [historyVisible, setHistoryVisible] = useState(false);
+    const [localEvents, setLocalEvents] = useState<LocalEvent[]>([]);
 
     const lastAccelRef = useRef(0);
     const lastRenderRef = useRef(0);
@@ -73,6 +76,7 @@ export default function HomeScreen() {
     const userLocationRef = useRef<{ latitude: number; longitude: number } | null>(null);
     const prevMapCoordRef = useRef<{ latitude: number; longitude: number } | null>(null);
     const mapRef = useRef<MapView>(null);
+    const snapshotMapRef = useRef<MapView>(null);
     const toastAnim = useRef(new Animated.Value(0)).current;
 
     useEffect(() => {
@@ -113,6 +117,7 @@ export default function HomeScreen() {
             }
 
             await initDatabase();
+            setLocalEvents(await getLocalEvents());
 
             setInterval(async () => {
                 if (!debugModeRef.current) await syncEvents();
@@ -136,13 +141,28 @@ export default function HomeScreen() {
                         setCollecting(true);
                         try {
                             const burst = await collectOrientedBurst();
+                            const detectedAt = new Date(currentLocation.timestamp).toISOString();
+                            const lat = currentLocation.coords.latitude;
+                            const lng = currentLocation.coords.longitude;
+
+                            let snapshotB64: string | null = null;
+                            try {
+                                snapshotB64 = await snapshotMapRef.current?.takeSnapshot({
+                                    width: 256,
+                                    height: 256,
+                                    format: 'jpg',
+                                    quality: 0.6,
+                                    result: 'base64',
+                                }) ?? null;
+                            } catch {
+                                // snapshot is best-effort
+                            }
+
+                            await saveLocalEvent(lat, lng, burst, detectedAt, snapshotB64);
+                            setLocalEvents(await getLocalEvents());
+
                             if (!debugModeRef.current) {
-                                await saveEvent(
-                                    currentLocation.coords.latitude,
-                                    currentLocation.coords.longitude,
-                                    burst,
-                                    new Date(currentLocation.timestamp).toISOString()
-                                );
+                                await saveEvent(lat, lng, burst, detectedAt);
                             }
                             setLastBurst(burst);
                             setPotholeCount(prev => prev + 1);
@@ -165,6 +185,10 @@ export default function HomeScreen() {
                     currentLocation = location;
                     const { latitude: lat, longitude: lng } = location.coords;
                     userLocationRef.current = { latitude: lat, longitude: lng };
+                    snapshotMapRef.current?.animateToRegion(
+                        { latitude: lat, longitude: lng, latitudeDelta: 0.004, longitudeDelta: 0.004 },
+                        0
+                    );
                     const speed = location.coords.speed ?? 0;
                     setGpsSpeed(speed);
 
@@ -301,6 +325,26 @@ export default function HomeScreen() {
                     </View>
                 </View>
             )}
+
+            {/* Off-screen map used only for taking snapshots at the user's location */}
+            <MapView
+                ref={snapshotMapRef}
+                style={{ position: 'absolute', left: -1000, top: 0, width: 256, height: 256 }}
+                mapType="standard"
+                showsUserLocation={false}
+                showsPointsOfInterest={false}
+                showsBuildings={false}
+                showsCompass={false}
+                scrollEnabled={false}
+                zoomEnabled={false}
+                rotateEnabled={false}
+                pitchEnabled={false}
+                initialRegion={userLocationRef.current ? {
+                    ...userLocationRef.current,
+                    latitudeDelta: 0.004,
+                    longitudeDelta: 0.004,
+                } : undefined}
+            />
 
             {/* Map toggle button */}
             <TouchableOpacity
@@ -445,6 +489,37 @@ export default function HomeScreen() {
                     </Animated.View>
                 </View>
             )}
+
+            {/* History tab — right edge, always on top */}
+            <TouchableOpacity
+                onPress={() => setHistoryVisible(true)}
+                style={{
+                    position: 'absolute',
+                    right: 0,
+                    top: '42%',
+                    backgroundColor: '#111',
+                    borderTopLeftRadius: 12,
+                    borderBottomLeftRadius: 12,
+                    paddingVertical: 18,
+                    paddingLeft: 10,
+                    paddingRight: 6,
+                    alignItems: 'center',
+                    gap: 4,
+                }}
+            >
+                <Text style={{ fontSize: 16 }}>📋</Text>
+                {localEvents.length > 0 && (
+                    <Text style={{ fontSize: 9, color: '#fff', fontWeight: '700', letterSpacing: 0.5 }}>
+                        {localEvents.length}
+                    </Text>
+                )}
+            </TouchableOpacity>
+
+            <EventHistoryDrawer
+                visible={historyVisible}
+                events={localEvents}
+                onClose={() => setHistoryVisible(false)}
+            />
         </View>
     );
 }

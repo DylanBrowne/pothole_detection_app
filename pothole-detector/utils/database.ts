@@ -47,7 +47,21 @@ const initDatabase = async () => {
             key TEXT PRIMARY KEY,
             value TEXT NOT NULL
         );
+        CREATE TABLE IF NOT EXISTS local_events (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            detected_at TEXT NOT NULL,
+            expires_at TEXT NOT NULL,
+            latitude REAL NOT NULL,
+            longitude REAL NOT NULL,
+            peak_accel REAL NOT NULL,
+            z_values TEXT NOT NULL,
+            snapshot_b64 TEXT
+        );
     `);
+    await db.runAsync(
+        'DELETE FROM local_events WHERE expires_at < ?',
+        [new Date().toISOString()]
+    );
 };
 
 async function saveEvent(latitude: number, longitude: number, burst: OrientedBurst, detectAt: string): Promise<void> {
@@ -87,6 +101,47 @@ export async function syncEvents() {
             console.log('Sync failed:', e);
         }
     }
+}
+
+export interface LocalEvent {
+    id: number;
+    detected_at: string;
+    latitude: number;
+    longitude: number;
+    peak_accel: number;
+    z_values: number[];
+    snapshot_b64: string | null;
+}
+
+export async function saveLocalEvent(
+    lat: number,
+    lng: number,
+    burst: OrientedBurst,
+    detectedAt: string,
+    snapshotB64: string | null
+): Promise<void> {
+    const expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
+    const peak = Math.max(...burst.z_values.map(Math.abs));
+    await db.runAsync(
+        `INSERT INTO local_events (detected_at, expires_at, latitude, longitude, peak_accel, z_values, snapshot_b64)
+         VALUES (?, ?, ?, ?, ?, ?, ?)`,
+        [detectedAt, expiresAt, lat, lng, peak, JSON.stringify(burst.z_values), snapshotB64]
+    );
+}
+
+export async function getLocalEvents(): Promise<LocalEvent[]> {
+    const rows = await db.getAllAsync<any>(
+        'SELECT * FROM local_events ORDER BY detected_at DESC'
+    );
+    return rows.map(r => ({
+        id: r.id,
+        detected_at: r.detected_at,
+        latitude: r.latitude,
+        longitude: r.longitude,
+        peak_accel: r.peak_accel,
+        z_values: JSON.parse(r.z_values),
+        snapshot_b64: r.snapshot_b64 ?? null,
+    }));
 }
 
 export { initDatabase, saveEvent };
