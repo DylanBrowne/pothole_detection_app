@@ -13,6 +13,8 @@ const CHART_HEIGHT = 72;
 const ACCEL_STALE_MS = 3000;
 const FETCH_RADIUS_MILES = 10;
 const REFETCH_THRESHOLD_MILES = 1.0;
+const DETECTION_COOLDOWN_MS = 5000;
+const TRIGGER_INTERVAL_MS = 20; // 50 Hz — enough to catch a spike, much less power than 200 Hz
 
 function distanceMiles(lat1: number, lng1: number, lat2: number, lng2: number): number {
     const R = 3958.8;
@@ -34,17 +36,25 @@ function BurstChart({ burst }: { burst: OrientedBurst }) {
     const values = burst.z_values;
     if (values.length === 0) return null;
     const maxAbs = Math.max(...values.map(Math.abs), 0.1);
+    const [width, setWidth] = useState(3);
+    const marginRight = 1;
     return (
-        <View style={{ flexDirection: 'row', alignItems: 'center', height: CHART_HEIGHT }}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', height: CHART_HEIGHT}}
+            onLayout={(e) => {
+                const totalMargins = marginRight * values.length;
+                const newWidth = e.nativeEvent.layout.width - totalMargins; 
+                setWidth(newWidth);
+            }}
+        >
             {values.map((v, i) => {
                 const h = Math.max(2, (Math.abs(v) / maxAbs) * (CHART_HEIGHT / 2));
                 return (
                     <View
                         key={i}
                         style={{
-                            width: 3,
+                            width: width / values.length,
                             height: h,
-                            marginRight: 1,
+                            marginRight: marginRight,
                             backgroundColor: v < 0 ? '#2196F3' : '#F44336',
                             alignSelf: 'center',
                         }}
@@ -72,6 +82,7 @@ export default function HomeScreen() {
 
     const lastAccelRef = useRef(0);
     const lastRenderRef = useRef(0);
+    const lastDetectionRef = useRef(0);
     const lastFetchRef = useRef<{ lat: number; lng: number } | null>(null);
     const userLocationRef = useRef<{ latitude: number; longitude: number } | null>(null);
     const prevMapCoordRef = useRef<{ latitude: number; longitude: number } | null>(null);
@@ -127,17 +138,18 @@ export default function HomeScreen() {
 
             const subscribeAccel = () => {
                 let isCollecting = false;
+                Accelerometer.setUpdateInterval(TRIGGER_INTERVAL_MS);
                 return Accelerometer.addListener(async ({ x, y, z }) => {
                     const now = Date.now();
                     lastAccelRef.current = now;
-                    // Throttle React state updates to 20Hz to avoid overwhelming the renderer
                     if (now - lastRenderRef.current >= 50) {
                         lastRenderRef.current = now;
                         setLiveAccel({ x, y, z });
                     }
                     const magnitude = Math.sqrt(x * x + y * y + z * z);
-                    if (magnitude > THRESHOLD && !isCollecting) {
+                    if (magnitude > THRESHOLD && !isCollecting && now - lastDetectionRef.current >= DETECTION_COOLDOWN_MS) {
                         isCollecting = true;
+                        lastDetectionRef.current = now;
                         setCollecting(true);
                         try {
                             const burst = await collectOrientedBurst();
@@ -170,6 +182,7 @@ export default function HomeScreen() {
                         } catch (e) {
                             console.error('Burst failed:', e);
                         } finally {
+                            Accelerometer.setUpdateInterval(TRIGGER_INTERVAL_MS);
                             setCollecting(false);
                             isCollecting = false;
                         }
@@ -332,6 +345,7 @@ export default function HomeScreen() {
                 style={{ position: 'absolute', left: -1000, top: 0, width: 256, height: 256 }}
                 mapType="standard"
                 showsUserLocation={false}
+                // Shows points of interests regardless of being set to false???
                 showsPointsOfInterest={false}
                 showsBuildings={false}
                 showsCompass={false}
